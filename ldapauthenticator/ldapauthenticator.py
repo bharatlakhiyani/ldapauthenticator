@@ -333,7 +333,7 @@ class LDAPAuthenticator(Authenticator):
             if self.escape_userdn:
                 userdn = escape_filter_chars(userdn)
             msg = 'Attempting to bind {username} with {userdn}'
-            self.log.debug(msg.format(username=username, userdn=userdn))
+            self.log.debug(msg.format(username=username[0], userdn=userdn))
             msg = "Status of user bind {username} with {userdn} : {is_bound}"
             try:
                 conn = self.get_connection(userdn, password)
@@ -346,7 +346,7 @@ class LDAPAuthenticator(Authenticator):
             else:
                 is_bound = conn.bind()
             msg = msg.format(
-                username=username,
+                username=username[0],
                 userdn=userdn,
                 is_bound=is_bound
             )
@@ -356,13 +356,13 @@ class LDAPAuthenticator(Authenticator):
 
         if not is_bound:
             msg = "Invalid password for user '{username}'"
-            self.log.warn(msg.format(username=username))
+            self.log.warn(msg.format(username=username[0]))
             return None
 
         if self.search_filter:
             search_filter = self.search_filter.format(
                 userattr=self.user_attribute,
-                username=username,
+                username=username[0],
             )
             conn.search(
                 search_base=self.user_search_base,
@@ -375,7 +375,7 @@ class LDAPAuthenticator(Authenticator):
                 msg = "User with '{userattr}={username}' not found in directory"
                 self.log.warn(msg.format(
                     userattr=self.user_attribute,
-                    username=username)
+                    username=username[0])
                 )
                 return None
             if n_users > 1:
@@ -385,13 +385,13 @@ class LDAPAuthenticator(Authenticator):
                 )
                 self.log.warn(msg.format(
                     userattr=self.user_attribute,
-                    username=username,
+                    username=username[0],
                     n_users=n_users)
                 )
                 return None
 
         if self.allowed_groups:
-            self.log.debug('username:%s Using dn %s', username, userdn)
+            self.log.debug('username:%s Using dn %s', username[0], userdn)
             found = False
             for group in self.allowed_groups:
                 group_filter = (
@@ -403,7 +403,7 @@ class LDAPAuthenticator(Authenticator):
                 )
                 group_filter = group_filter.format(
                     userdn=userdn,
-                    uid=username
+                    uid=username[0]
                 )
                 group_attributes = ['member', 'uniqueMember', 'memberUid']
                 found = conn.search(
@@ -417,11 +417,11 @@ class LDAPAuthenticator(Authenticator):
             if not found:
                 # If we reach here, then none of the groups matched
                 msg = 'username:{username} User not in any of the allowed groups'
-                self.log.warn(msg.format(username=username))
+                self.log.warn(msg.format(username=username[0]))
                 return None
 
         if self.use_lookup_dn_username:
-            return username
+            return username[0]
         else:
             return data['username']
 
