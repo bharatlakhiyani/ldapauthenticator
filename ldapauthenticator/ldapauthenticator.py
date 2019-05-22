@@ -329,7 +329,7 @@ class LDAPAuthenticator(Authenticator):
             if not dn:
                 self.log.warn("Ignoring blank 'bind_dn_template' entry!")
                 continue
-            userdn = dn.format(username=username)
+            userdn = dn.format(username=username[0])
             if self.escape_userdn:
                 userdn = escape_filter_chars(userdn)
             msg = 'Attempting to bind {username} with {userdn}'
