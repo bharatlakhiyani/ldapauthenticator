@@ -5,6 +5,7 @@ import ldap3
 from ldap3.utils.conv import escape_filter_chars
 from tornado import gen
 from traitlets import Unicode, Int, Bool, List, Union
+import os
 
 
 class LDAPAuthenticator(Authenticator):
@@ -293,7 +294,15 @@ class LDAPAuthenticator(Authenticator):
 
     @gen.coroutine
     def authenticate(self, handler, data):
-        username = data['username']
+        prefixUsername = os.environ['USERNAME_PREFIX']
+        # Check if username is list of emails
+        if isinstance(data['username'], list):
+            username = data['username'][0]
+            usernameNonLookup = data['username'][0]
+        else:
+            username = data['username']
+            usernameNonLookup = data['username'][0]
+
         password = data['password']
 
         # Protect against invalid usernames as well as LDAP injection attacks
@@ -329,11 +338,11 @@ class LDAPAuthenticator(Authenticator):
             if not dn:
                 self.log.warn("Ignoring blank 'bind_dn_template' entry!")
                 continue
-            userdn = dn.format(username=username[0])
+            userdn = dn.format(username=username)
             if self.escape_userdn:
                 userdn = escape_filter_chars(userdn)
             msg = 'Attempting to bind {username} with {userdn}'
-            self.log.debug(msg.format(username=username[0], userdn=userdn))
+            self.log.debug(msg.format(username=username, userdn=userdn))
             msg = "Status of user bind {username} with {userdn} : {is_bound}"
             try:
                 conn = self.get_connection(userdn, password)
@@ -346,7 +355,7 @@ class LDAPAuthenticator(Authenticator):
             else:
                 is_bound = conn.bind()
             msg = msg.format(
-                username=username[0],
+                username=username,
                 userdn=userdn,
                 is_bound=is_bound
             )
@@ -356,13 +365,13 @@ class LDAPAuthenticator(Authenticator):
 
         if not is_bound:
             msg = "Invalid password for user '{username}'"
-            self.log.warn(msg.format(username=username[0]))
+            self.log.warn(msg.format(username=username))
             return None
 
         if self.search_filter:
             search_filter = self.search_filter.format(
                 userattr=self.user_attribute,
-                username=username[0],
+                username=username,
             )
             conn.search(
                 search_base=self.user_search_base,
@@ -375,7 +384,7 @@ class LDAPAuthenticator(Authenticator):
                 msg = "User with '{userattr}={username}' not found in directory"
                 self.log.warn(msg.format(
                     userattr=self.user_attribute,
-                    username=username[0])
+                    username=username)
                 )
                 return None
             if n_users > 1:
@@ -385,13 +394,13 @@ class LDAPAuthenticator(Authenticator):
                 )
                 self.log.warn(msg.format(
                     userattr=self.user_attribute,
-                    username=username[0],
+                    username=username,
                     n_users=n_users)
                 )
                 return None
 
         if self.allowed_groups:
-            self.log.debug('username:%s Using dn %s', username[0], userdn)
+            self.log.debug('username:%s Using dn %s', username, userdn)
             found = False
             for group in self.allowed_groups:
                 group_filter = (
@@ -403,7 +412,7 @@ class LDAPAuthenticator(Authenticator):
                 )
                 group_filter = group_filter.format(
                     userdn=userdn,
-                    uid=username[0]
+                    uid=username
                 )
                 group_attributes = ['member', 'uniqueMember', 'memberUid']
                 found = conn.search(
@@ -417,13 +426,15 @@ class LDAPAuthenticator(Authenticator):
             if not found:
                 # If we reach here, then none of the groups matched
                 msg = 'username:{username} User not in any of the allowed groups'
-                self.log.warn(msg.format(username=username[0]))
+                self.log.warn(msg.format(username=username))
                 return None
 
         if self.use_lookup_dn_username:
-            return username[0]
+            if prefixUsername is not None:
+                username = prefixUsername + username
+            return username
         else:
-            return data['username']
+            return usernameNonLookup
 
 
 if __name__ == "__main__":
