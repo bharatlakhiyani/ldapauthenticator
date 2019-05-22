@@ -296,13 +296,7 @@ class LDAPAuthenticator(Authenticator):
     def authenticate(self, handler, data):
         prefixUsername = os.environ['USERNAME_PREFIX']
         # Check if username is list of emails
-        if isinstance(data['username'], list):
-            username = data['username'][0]
-            usernameNonLookup = data['username'][0]
-        else:
-            username = data['username']
-            usernameNonLookup = data['username'][0]
-
+        username = data['username']
         password = data['password']
 
         # Protect against invalid usernames as well as LDAP injection attacks
@@ -332,6 +326,9 @@ class LDAPAuthenticator(Authenticator):
         if isinstance(bind_dn_template, str):
             # bind_dn_template should be of type List[str]
             bind_dn_template = [bind_dn_template]
+
+        if isinstance(username, list):
+            username = username[0]
 
         is_bound = False
         for dn in bind_dn_template:
@@ -434,7 +431,9 @@ class LDAPAuthenticator(Authenticator):
                 username = prefixUsername + username
             return username
         else:
-            return usernameNonLookup
+            if prefixUsername is not None:
+                username = prefixUsername + data['username']
+            return username
 
 
 if __name__ == "__main__":
